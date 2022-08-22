@@ -15,12 +15,10 @@ export class InternalModuleWeb extends InternalModule {
 
     async create_dynamic_templates(): Promise<void> {}
 
-    async getRequest(url: string): Promise<Response> {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new TemplaterError("Error performing GET request");
-        }
-        return response;
+    test(): () => Promise<string> {
+        return async () => {
+            return "# Test"
+        };
     }
 
     generate_daily_quote(): () => Promise<string> {
