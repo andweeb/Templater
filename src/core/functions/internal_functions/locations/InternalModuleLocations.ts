@@ -47,6 +47,17 @@ interface GooglePlaceDetails {
     url: string;
     user_ratings_total: number;
     website: string;
+    [key: string]: any;
+}
+interface GooglePlace {
+    name: string;
+    summary: string;
+    address: string;
+    website: string;
+    categories: string[]
+    url: string;
+    review_count: number;
+    ratings: string;
 }
 
 interface Category {
@@ -87,6 +98,23 @@ interface Place {
 
 type YelpSearchInput = YelpCoordinateSearch | YelpCityBasedSearch;
 
+const YELP_API_URL = 'https://api.yelp.com/v3/graphql';
+const GOOGLE_PLACES_API_BASE_URL = 'https://maps.googleapis.com/maps/api/place';
+const GOOGLE_PLACES_PLACE_URL = `${GOOGLE_PLACES_API_BASE_URL}/findplacefromtext/json`;
+const GOOGLE_PLACES_PLACE_DETAILS_URL = `${GOOGLE_PLACES_API_BASE_URL}/details/json`;
+
+const DEFAULT_GOOGLE_DETAILS = [
+    'name',
+    'editorial_summary',
+    'formatted_address',
+    'photos',
+    'rating',
+    'url',
+    'user_ratings_total',
+    'website'
+];
+
+
 export class InternalModuleLocations extends InternalModule {
     name: ModuleName = "locations";
 
@@ -97,10 +125,11 @@ export class InternalModuleLocations extends InternalModule {
     async create_static_templates(): Promise<void> {
         this.static_functions.set("search_place", this.generate_place_search());
         this.static_functions.set("search_yelp", this.generate_yelp_search());
+        this.static_functions.set("search_google_places", this.generate_google_places_search());
     }
 
-    // Public API to retrieve Yelp information using system commands
-    generate_place_search(): (tp: any) => Promise<Place> {
+    // Public API to retrieve both Google Places and Yelp information using system commands
+    generate_place_search(): (tp: any) => Promise<Place | null> {
         return async (tp: any): Promise<Place | null> => {
             if (!this.plugin.settings.google_api_key) {
                 throw new TemplaterError('Google API key was not found');
@@ -108,10 +137,15 @@ export class InternalModuleLocations extends InternalModule {
 
             // Fetch Yelp search result
             const yelpResults = await this.generate_yelp_search()(tp);
-            if (yelpResults === null) return // Aborted search
+            console.log('yelpResults', yelpResults);
+
+            // Aborted search
+            if (yelpResults === null) {
+                return null;
+            }
             if (!yelpResults.length) {
                 new tp.obsidian.Notice('Failed to find Yelp business results');
-                return;
+                return null;
             }
             const [business] = yelpResults;
 
@@ -131,7 +165,9 @@ export class InternalModuleLocations extends InternalModule {
             // Fetch Google Place and Place Detail search result
             const { latitude, longitude } = business.coordinates;
             const google_place_id = await this.search_google_place(name, latitude, longitude);
+            console.log('google_place_id', google_place_id);
             const google_place_details = await this.fetch_google_place_details(google_place_id);
+            console.log('google_place_details', google_place_details);
             const summary = google_place_details.editorial_summary ? google_place_details.editorial_summary.overview : '';
             const address = google_place_details.formatted_address;
             const website = google_place_details.website || '';
@@ -145,7 +181,7 @@ export class InternalModuleLocations extends InternalModule {
 
             return {
                 name,
-                summary,
+                summary: summary || '',
                 address,
                 website,
                 location,
@@ -157,6 +193,55 @@ export class InternalModuleLocations extends InternalModule {
                 google_url,
                 google_review_count,
                 google_ratings,
+            };
+        };
+    }
+
+    // Public API to retrieve Google Place information using system commands
+    generate_google_places_search(): (tp: any) => Promise<GooglePlace | null> {
+        return async (tp: any): Promise<GooglePlace | null> => {
+            if (!this.plugin.settings.google_api_key) {
+                throw new TemplaterError('Google API key was not found');
+            }
+
+            const name = await tp.system.prompt("Enter business name");
+            if (!name) {
+                return null;
+            }
+
+            const city = await tp.system.suggester(cities, cities, false, "Select a city", 10)
+            if (!city) {
+                return null;
+            }
+
+            // Fetch Google Place and Place Detail search result
+            const text = `${name} ${city}`;
+            const details = [...DEFAULT_GOOGLE_DETAILS, 'address_components', 'types'];
+            const google_place_id = await this.search_google_place(text);
+            const google_place_details = await this.fetch_google_place_details(google_place_id, details);
+            const summary = google_place_details.editorial_summary ? google_place_details.editorial_summary.overview : '';
+            const address = google_place_details.formatted_address;
+            const website = google_place_details.website || '';
+            const url = google_place_details.url;
+            const review_count = google_place_details.user_ratings_total;
+            const categories = google_place_details.types
+                ? google_place_details.types.join('\n  - ')
+                : '';
+
+            // Create google rating stars text
+            const rounded_google_rating = Math.ceil(google_place_details.rating);
+            const google_stars = [...this.make_stars(rounded_google_rating, '★'), ...this.make_stars(5 - rounded_google_rating, '☆')]
+            const ratings = google_stars.join('')
+
+            return {
+                name,
+                summary: summary || '',
+                address,
+                website,
+                categories,
+                url,
+                review_count,
+                ratings,
             };
         };
     }
@@ -214,8 +299,12 @@ ${search_inputs.map((input) => this.create_yelp_search_block(input)).join('\n')}
     }
 
     // Public API to retrieve Yelp information using system commands
-    generate_yelp_search(): (tp: any) => Promise<YelpBusiness[]> {
+    generate_yelp_search(): (tp: any) => Promise<YelpBusiness[] | null> {
         return async (tp: any): Promise<YelpBusiness[] | null> => {
+            if (!this.plugin.settings.yelp_api_key) {
+                throw new TemplaterError('Yelp API key was not found');
+            }
+
             const name = await tp.system.prompt("Enter business name");
             if (!name) {
                 return null;
@@ -224,10 +313,6 @@ ${search_inputs.map((input) => this.create_yelp_search_block(input)).join('\n')}
             const city = await tp.system.suggester(cities, cities, false, "Select a city", 10)
             if (!city) {
                 return null;
-            }
-
-            if (!this.plugin.settings.yelp_api_key) {
-                throw new TemplaterError('Yelp API key was not found');
             }
 
             const response = await this.search_yelp([ { name, city } ]);
@@ -244,7 +329,7 @@ ${search_inputs.map((input) => this.create_yelp_search_block(input)).join('\n')}
         const query = this.generate_yelp_query(search_inputs);
 
         const { cors_proxy_url, yelp_api_key } = this.plugin.settings;
-        const request = new Request(`${cors_proxy_url}/https://api.yelp.com/v3/graphql`, {
+        const request = new Request(`${cors_proxy_url}/${YELP_API_URL}`, {
             method: 'POST',
             body: JSON.stringify({ query }),
             headers: new Headers({
@@ -272,23 +357,30 @@ ${search_inputs.map((input) => this.create_yelp_search_block(input)).join('\n')}
         }
 
         // Normalize results into businesses list
+        // @ts-ignore
         return Object.values(data).reduce((acc, data) => [...acc, ...data.business], []);
     }
 
     // -------------------------------------------------------------------------------- 
     // Google API
-    private async search_google_place(name: string, latitude: number, longitude: number): Promise<any> {
+    private async search_google_place(name: string, latitude?: number, longitude?: number): Promise<any> {
         const { cors_proxy_url, google_api_key } = this.plugin.settings;
-        const params = new URLSearchParams({
-            input: name,
-            inputtype: 'textquery',
-            locationbias: `point:${latitude},${longitude}`,
-            key: google_api_key,
-        });
-        const url = `${cors_proxy_url}/https://maps.googleapis.com/maps/api/place/findplacefromtext/json?${params}`;
+        const parameterMap = new Map<string, string>([
+            ['input', name],
+            ['inputtype', 'textquery'],
+            ['key', google_api_key],
+        ]);
+
+        // Add coordinate location bias if provided
+        if (latitude && longitude) {
+            parameterMap.set('locationbias', `point:${latitude},${longitude}`);
+        }
+
+        // Construct URL from input parameters
+        const params = new URLSearchParams(Object.fromEntries(parameterMap));
+        const url = `${cors_proxy_url}/${GOOGLE_PLACES_PLACE_URL}?${params}`;
 
         const request = new Request(url);
-
         const response = await fetch(request, {
             method: 'GET',
             headers: {
@@ -310,14 +402,17 @@ ${search_inputs.map((input) => this.create_yelp_search_block(input)).join('\n')}
         return candidate.place_id;
     }
 
-    private async fetch_google_place_details(place_id: string): Promise<GooglePlaceDetails> {
+    private async fetch_google_place_details(
+        place_id: string,
+        details: string[] = DEFAULT_GOOGLE_DETAILS,
+    ): Promise<GooglePlaceDetails> {
         const { cors_proxy_url, google_api_key } = this.plugin.settings;
         const params = new URLSearchParams({
-            fields: 'name,editorial_summary,formatted_address,photos,rating,url,user_ratings_total,website',
+            fields: details.join(','),
             key: google_api_key,
             place_id,
         });
-        const url = `${cors_proxy_url}/https://maps.googleapis.com/maps/api/place/details/json?${params}`;
+        const url = `${cors_proxy_url}/${GOOGLE_PLACES_PLACE_DETAILS_URL}?${params}`;
 
         const request = new Request(url);
 
