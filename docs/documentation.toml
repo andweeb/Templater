@@ -577,6 +577,10 @@ example = """<% tp.system.suggester(item => item, Object.keys(app.metadataCache.
 name = "web"
 description = "This modules contains every internal function related to the web (making web requests)."
 
+[tp.locations]
+name = "locations"
+description = "This modules contains every internal function related to locations."
+
 [tp.web.functions.daily_quote]
 name = "daily_quote"
 description = "Retrieves and parses the daily quote from the API `https://api.quotable.io` as a callout."

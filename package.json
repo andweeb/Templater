@@ -19,7 +19,7 @@
         "obsidian-plugin",
         "obsidian-md-plugin"
     ],
-    "author": "SilentVoid13",
+    "author": "SilentVoid13, andweeb",
     "license": "AGPL-3.0-only",
     "devDependencies": {
         "@types/chai": "^4.3.4",

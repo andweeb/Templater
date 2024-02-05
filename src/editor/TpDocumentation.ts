@@ -13,6 +13,7 @@ const module_names = [
     "system",
     "user",
     "web",
+    "locations",
 ] as const;
 export type ModuleName = (typeof module_names)[number];
 const module_names_checker: Set<string> = new Set(module_names);

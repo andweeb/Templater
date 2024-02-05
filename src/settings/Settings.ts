@@ -46,6 +46,9 @@ export interface Settings {
     enabled_templates_hotkeys: Array<string>;
     startup_templates: Array<string>;
     enable_ribbon_icon: boolean;
+    google_api_key: string;
+    yelp_api_key: string;
+    cors_proxy_url: string;
 }
 
 export class TemplaterSettingTab extends PluginSettingTab {
@@ -71,10 +74,37 @@ export class TemplaterSettingTab extends PluginSettingTab {
         this.add_user_script_functions_setting();
         this.add_user_system_command_functions_setting();
         this.add_donating_setting();
+        this.add_api_key_setting('Google API');
+        this.add_api_key_setting('Yelp API');
+        this.add_cors_proxy_setting();
     }
 
     add_general_setting_header(): void {
         this.containerEl.createEl("h2", { text: "General Settings" });
+    }
+
+    add_api_key_setting(api: string): void {
+        new Setting(this.containerEl)
+            .setName(`${api} key`)
+            .addText((cb) => {
+                cb.onChange((value) => {
+                    const key = `${api.toLowerCase().replace(' ', '_')}_key`;
+                    this.plugin.settings[key] = value;
+                    this.plugin.save_settings();
+                });
+            })
+    }
+
+    add_cors_proxy_setting(): void {
+        new Setting(this.containerEl)
+            .setName('CORS Proxy URL')
+            .addText((cb) => {
+                cb.setPlaceholder("https://proxy.example.com")
+                    .onChange((value) => {
+                        this.plugin.settings.cors_proxy_url = value;
+                        this.plugin.save_settings();
+                    });
+            })
     }
 
     add_template_folder_setting(): void {
