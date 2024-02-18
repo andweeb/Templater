@@ -9,6 +9,7 @@ import { InternalModuleFrontmatter } from "./frontmatter/InternalModuleFrontmatt
 import { InternalModuleSystem } from "./system/InternalModuleSystem";
 import { RunningConfig } from "core/Templater";
 import { InternalModuleConfig } from "./config/InternalModuleConfig";
+import { InternalModuleLocations } from "./locations/InternalModuleLocations";
 
 export class InternalFunctions implements IGenerateObject {
     private modules_array: Array<InternalModule> = [];
@@ -21,6 +22,7 @@ export class InternalFunctions implements IGenerateObject {
         this.modules_array.push(new InternalModuleHooks(this.plugin));
         this.modules_array.push(new InternalModuleSystem(this.plugin));
         this.modules_array.push(new InternalModuleConfig(this.plugin));
+        this.modules_array.push(new InternalModuleLocations(this.plugin));
     }
 
     async init(): Promise<void> {
