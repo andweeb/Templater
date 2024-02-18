@@ -118,6 +118,8 @@ const DEFAULT_GOOGLE_DETAILS = [
 export class InternalModuleLocations extends InternalModule {
     name: ModuleName = "locations";
 
+    async teardown(): Promise<void> {}
+
     async create_dynamic_templates(): Promise<void> {
         // required on InternalModule but unnecessary
     }
@@ -175,7 +177,7 @@ export class InternalModuleLocations extends InternalModule {
             const google_review_count = google_place_details.user_ratings_total;
 
             // Create google rating stars text
-            const rounded_google_rating = Math.ceil(google_place_details.rating);
+            const rounded_google_rating = Math.ceil(google_place_details.rating) || 0;
             const google_stars = [...this.make_stars(rounded_google_rating, '★'), ...this.make_stars(5 - rounded_google_rating, '☆')]
             const google_ratings = google_stars.join('')
 
