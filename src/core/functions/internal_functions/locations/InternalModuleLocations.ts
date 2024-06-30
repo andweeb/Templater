@@ -221,17 +221,18 @@ export class InternalModuleLocations extends InternalModule {
             const details = [...DEFAULT_GOOGLE_DETAILS, 'address_components', 'types'];
             const google_place_id = await this.search_google_place(text);
             const google_place_details = await this.fetch_google_place_details(google_place_id, details);
+
             const summary = google_place_details.editorial_summary ? google_place_details.editorial_summary.overview : '';
             const address = google_place_details.formatted_address;
             const website = google_place_details.website || '';
             const url = google_place_details.url;
-            const review_count = google_place_details.user_ratings_total;
+            const review_count = google_place_details.user_ratings_total || 0;
             const categories = google_place_details.types
                 ? google_place_details.types.join('\n  - ')
                 : '';
 
             // Create google rating stars text
-            const rounded_google_rating = Math.ceil(google_place_details.rating);
+            const rounded_google_rating = Math.ceil(google_place_details.rating) || 0;
             const google_stars = [...this.make_stars(rounded_google_rating, '★'), ...this.make_stars(5 - rounded_google_rating, '☆')]
             const ratings = google_stars.join('')
 
